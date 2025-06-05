@@ -10,7 +10,6 @@ import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.List;
-
 @Service
 @Transactional
 @AllArgsConstructor
@@ -20,11 +19,14 @@ public class PhoneNumberPrefixService {
     private final PrefixMapper mapper;
     private final PrefixCache cache;
 
-
     public List<PrefixDtoResponse> getAll() {
         return repository.findAll()
                 .stream()
-                .map(mapper::toDto)
+                .map(prefix -> {
+                    PrefixDtoResponse dto = mapper.toDto(prefix);
+                    cache.put(dto.getId(), dto);
+                    return dto;
+                })
                 .toList();
     }
 
@@ -64,22 +66,33 @@ public class PhoneNumberPrefixService {
     public List<PrefixDtoResponse> getByCountry(String countryCode) {
         return repository.findByCountryCode(countryCode)
                 .stream()
-                .map(mapper::toDto)
+                .map(prefix -> {
+                    PrefixDtoResponse dto = mapper.toDto(prefix);
+                    cache.put(dto.getId(), dto);
+                    return dto;
+                })
                 .toList();
     }
 
     public List<PrefixDtoResponse> getByCountryName(String name) {
         return repository.findByCountryName(name)
                 .stream()
-                .map(mapper::toDto)
+                .map(prefix -> {
+                    PrefixDtoResponse dto = mapper.toDto(prefix);
+                    cache.put(dto.getId(), dto);
+                    return dto;
+                })
                 .toList();
     }
-
 
     public PrefixDtoResponse save(PrefixDtoRequest request) {
         if (repository.existsByPrefixAndCountryCode(request.getPrefix(), request.getCountryCode())) {
             throw new IllegalArgumentException("Префикс '" + request.getPrefix() + "' уже существует для страны '" + request.getCountryCode() + "'");
         }
-        return mapper.toDto(repository.save(mapper.toEntity(request)));
+        var saved = repository.save(mapper.toEntity(request));
+        PrefixDtoResponse dto = mapper.toDto(saved);
+        cache.put(dto.getId(), dto);
+        return dto;
     }
 }
+
